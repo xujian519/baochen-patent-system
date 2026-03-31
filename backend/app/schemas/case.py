@@ -13,21 +13,23 @@ class CaseBase(BaseModel):
     entity: str = Field(default="宝宸", max_length=20, description="主体: 宝宸/瑞宸")
     client_id: Optional[int] = Field(None, description="客户ID（二选一）")
     client_name: Optional[str] = Field(None, max_length=200, description="客户名称（二选一，用于自定义输入）")
-    title: str = Field(..., max_length=500, description="发明名称")
+    title: str = Field(..., max_length=500, description="案件名称")
     patent_type: str = Field(..., max_length=20, description="专利类型: 发明/实用新型/外观设计")
     application_number: Optional[str] = Field(None, max_length=50, description="申请号")
-    filing_date: Optional[date] = Field(None, description="申请日")
+    filing_date: Optional[date] = Field(None, description="申请日（递交国知局日期）")
     publication_number: Optional[str] = Field(None, max_length=50, description="公开号")
     grant_number: Optional[str] = Field(None, max_length=50, description="授权公告号")
     grant_date: Optional[date] = Field(None, description="授权日")
     applicant: Optional[str] = Field(None, description="申请人")
     inventor: Optional[str] = Field(None, description="发明人")
+    patent_holder: Optional[str] = Field(None, max_length=500, description="专利权人（可与客户不同）")
     agent_id: Optional[int] = Field(None, description="代理师ID")
     agent_name: Optional[str] = Field(None, max_length=100, description="代理师名称（自定义输入）")
     assistant_id: Optional[int] = Field(None, description="协办人ID")
     assistant_name: Optional[str] = Field(None, max_length=100, description="协办人名称（自定义输入）")
     examiner: Optional[str] = Field(None, max_length=100, description="审查员")
-    status: str = Field(default="新案", max_length=50, description="状态")
+    stage: str = Field(default="新案", max_length=50, description="案件阶段: 新案/撰写中/待质检/已定稿/待递交/已递交-在审/答复OA/授权/驳回/放弃/结案归档")
+    case_status: str = Field(default="进行中", max_length=20, description="案件状态: 进行中/已结案/已终止/已暂停")
     current_stage: Optional[str] = Field(None, max_length=50, description="当前节点")
     ipc_codes: Optional[str] = Field(None, max_length=200, description="IPC分类号")
     tech_field: Optional[str] = Field(None, max_length=100, description="技术领域")
@@ -35,6 +37,7 @@ class CaseBase(BaseModel):
     nearest_deadline: Optional[date] = Field(None, description="最近期限")
     deadline_level: int = Field(default=0, ge=0, le=3, description="预警级别 0-3")
     quotation_amount: Optional[Decimal] = Field(None, description="报价金额")
+    fee_reduction_ratio: int = Field(default=0, ge=0, le=100, description="费减比例: 0/70/85/100")
     is_contract_signed: bool = Field(default=False, description="是否签合同")
     notes: Optional[str] = Field(None, description="备注")
 
@@ -50,10 +53,11 @@ class CaseCreate(CaseBase):
 
 class CaseUpdate(BaseModel):
     """更新案件请求模型 - 所有字段可选"""
+    case_number: Optional[str] = Field(None, max_length=50, description="案件编号（仅管理员可修改）")
     entity: Optional[str] = Field(None, max_length=20, description="主体: 宝宸/瑞宸")
     client_id: Optional[int] = Field(None, description="客户ID")
     client_name: Optional[str] = Field(None, max_length=200, description="客户名称（自定义输入）")
-    title: Optional[str] = Field(None, max_length=500, description="发明名称")
+    title: Optional[str] = Field(None, max_length=500, description="案件名称")
     patent_type: Optional[str] = Field(None, max_length=20, description="专利类型")
     application_number: Optional[str] = Field(None, max_length=50, description="申请号")
     filing_date: Optional[date] = Field(None, description="申请日")
@@ -62,12 +66,14 @@ class CaseUpdate(BaseModel):
     grant_date: Optional[date] = Field(None, description="授权日")
     applicant: Optional[str] = Field(None, description="申请人")
     inventor: Optional[str] = Field(None, description="发明人")
+    patent_holder: Optional[str] = Field(None, max_length=500, description="专利权人")
     agent_id: Optional[int] = Field(None, description="代理师ID")
     agent_name: Optional[str] = Field(None, max_length=100, description="代理师名称（自定义输入）")
     assistant_id: Optional[int] = Field(None, description="协办人ID")
     assistant_name: Optional[str] = Field(None, max_length=100, description="协办人名称（自定义输入）")
     examiner: Optional[str] = Field(None, max_length=100, description="审查员")
-    status: Optional[str] = Field(None, max_length=50, description="状态")
+    stage: Optional[str] = Field(None, max_length=50, description="案件阶段")
+    case_status: Optional[str] = Field(None, max_length=20, description="案件状态")
     current_stage: Optional[str] = Field(None, max_length=50, description="当前节点")
     ipc_codes: Optional[str] = Field(None, max_length=200, description="IPC分类号")
     tech_field: Optional[str] = Field(None, max_length=100, description="技术领域")
@@ -75,6 +81,7 @@ class CaseUpdate(BaseModel):
     nearest_deadline: Optional[date] = Field(None, description="最近期限")
     deadline_level: Optional[int] = Field(None, ge=0, le=3, description="预警级别 0-3")
     quotation_amount: Optional[Decimal] = Field(None, description="报价金额")
+    fee_reduction_ratio: Optional[int] = Field(None, ge=0, le=100, description="费减比例")
     is_contract_signed: Optional[bool] = Field(None, description="是否签合同")
     notes: Optional[str] = Field(None, description="备注")
 
@@ -123,14 +130,19 @@ class CaseBrief(BaseModel):
     case_number: str
     title: str
     patent_type: str
-    status: str
+    stage: str = Field(..., description="案件阶段")
+    case_status: str = Field(default="进行中", description="案件状态")
     client_id: int
     client: Optional[ClientBriefForCase] = None
     agent_id: Optional[int] = None
     agent: Optional[UserBriefForCase] = None
     assistant_id: Optional[int] = None
     assistant: Optional[UserBriefForCase] = None
+    application_number: Optional[str] = None
     filing_date: Optional[date] = None
+    grant_date: Optional[date] = None
+    patent_holder: Optional[str] = None
+    fee_reduction_ratio: int = 0
     nearest_deadline: Optional[date] = None
     deadline_level: int = 0
     created_at: datetime
@@ -167,7 +179,7 @@ class DeadlineBriefForCase(BaseModel):
     id: int
     deadline_type: str
     deadline_date: date
-    is_completed: bool  # 改为 is_completed
+    is_completed: bool
 
     class Config:
         from_attributes = True
@@ -177,8 +189,8 @@ class TimelineBriefForCase(BaseModel):
     """时间线的简要信息"""
     id: int
     event_type: str
-    description: str  # 对应模型中的 description 字段
-    event_date: date  # 对应模型中的 event_date 字段
+    description: str
+    event_date: date
 
     class Config:
         from_attributes = True
@@ -206,7 +218,8 @@ class CaseListResponse(BaseModel):
 
 class CaseStatusUpdate(BaseModel):
     """案件状态更新请求"""
-    status: str = Field(..., description="新状态")
+    stage: Optional[str] = Field(None, description="新案件阶段")
+    case_status: Optional[str] = Field(None, description="新案件状态")
     notes: Optional[str] = Field(None, description="备注说明")
 
     class Config:

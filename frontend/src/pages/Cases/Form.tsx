@@ -3,7 +3,7 @@ import { useCaseStore } from '@/stores/case'
 import { useAuthStore } from '@/stores/auth'
 import * as clientsApi from '@/api/clients'
 import * as usersApi from '@/api/users'
-import type { Client, User } from '@/types/api'
+import type { Client, User, CaseStageType, CaseStatusType, FeeReductionRatio } from '@/types/api'
 import {
   Dialog,
   DialogContent,
@@ -25,12 +25,19 @@ import {
 import { Combobox, type ComboboxOption } from '@/components/ui/combobox'
 import { toast } from 'sonner'
 
-// 专利类型选项
-const PATENT_TYPES = [
-  { value: '发明', label: '发明' },
-  { value: '实用新型', label: '实用新型' },
-  { value: '外观设计', label: '外观设计' },
-]
+// 导入共享模块
+import {
+  PATENT_TYPE_FORM_OPTIONS,
+  STAGE_FORM_OPTIONS,
+  CASE_STATUS_FORM_OPTIONS,
+  FEE_REDUCTION_FORM_OPTIONS,
+} from '@/utils/case-helpers'
+
+// 使用共享模块中的选项
+const PATENT_TYPES = PATENT_TYPE_FORM_OPTIONS
+const STAGE_OPTIONS = STAGE_FORM_OPTIONS
+const CASE_STATUS_OPTIONS = CASE_STATUS_FORM_OPTIONS
+const FEE_REDUCTION_OPTIONS = FEE_REDUCTION_FORM_OPTIONS
 
 export default function CaseForm() {
   const {
@@ -59,11 +66,16 @@ export default function CaseForm() {
     client_value: '', // 可以是 ID（数字字符串）或名称
     title: '',
     patent_type: '发明',
+    patent_holder: '',
+    fee_reduction_ratio: 0 as FeeReductionRatio,
     agent_value: '',
     assistant_value: '',
     application_number: '',
     filing_date: '',
-    remarks: '',
+    grant_date: '',
+    stage: '新案' as CaseStageType,
+    case_status: '进行中' as CaseStatusType,
+    notes: '',
     case_number: '',
   })
 
@@ -96,11 +108,16 @@ export default function CaseForm() {
         client_value: currentCase.client?.name || String(currentCase.client_id),
         title: currentCase.title,
         patent_type: currentCase.patent_type,
+        patent_holder: currentCase.patent_holder || '',
+        fee_reduction_ratio: currentCase.fee_reduction_ratio || 0,
         agent_value: currentCase.agent?.name || '',
         assistant_value: currentCase.assistant?.name || '',
         application_number: currentCase.application_number || '',
         filing_date: currentCase.filing_date ? currentCase.filing_date.split('T')[0] : '',
-        remarks: currentCase.remarks || '',
+        grant_date: currentCase.grant_date ? currentCase.grant_date.split('T')[0] : '',
+        stage: currentCase.stage || '新案',
+        case_status: currentCase.case_status || '进行中',
+        notes: currentCase.notes || '',
         case_number: currentCase.case_number,
       })
     } else {
@@ -109,11 +126,16 @@ export default function CaseForm() {
         client_value: '',
         title: '',
         patent_type: '发明',
+        patent_holder: '',
+        fee_reduction_ratio: 0,
         agent_value: '',
         assistant_value: '',
         application_number: '',
         filing_date: '',
-        remarks: '',
+        grant_date: '',
+        stage: '新案',
+        case_status: '进行中',
+        notes: '',
         case_number: '',
       })
     }
@@ -153,7 +175,7 @@ export default function CaseForm() {
       newErrors.client_value = '请输入或选择客户'
     }
     if (!formData.title.trim()) {
-      newErrors.title = '请输入发明名称'
+      newErrors.title = '请输入案件名称'
     }
     if (!formData.patent_type) {
       newErrors.patent_type = '请选择专利类型'
@@ -201,9 +223,11 @@ export default function CaseForm() {
           ...getClientData(),
           title: formData.title.trim(),
           patent_type: formData.patent_type as '发明' | '实用新型' | '外观设计',
+          patent_holder: formData.patent_holder.trim() || undefined,
+          fee_reduction_ratio: formData.fee_reduction_ratio,
           ...getAgentData(),
           ...getAssistantData(),
-          remarks: formData.remarks.trim() || undefined,
+          notes: formData.notes.trim() || undefined,
         })
         toast.success('案件创建成功')
       } else {
@@ -212,11 +236,16 @@ export default function CaseForm() {
         await updateCase(formCaseId, {
           title: formData.title.trim(),
           patent_type: formData.patent_type as '发明' | '实用新型' | '外观设计',
+          patent_holder: formData.patent_holder.trim() || undefined,
+          fee_reduction_ratio: formData.fee_reduction_ratio,
           ...getAgentData(),
           ...getAssistantData(),
-          application_number: formData.application_number.trim() || null,
-          filing_date: formData.filing_date || null,
-          remarks: formData.remarks.trim() || undefined,
+          application_number: formData.application_number.trim() || undefined,
+          filing_date: formData.filing_date || undefined,
+          grant_date: formData.grant_date || undefined,
+          stage: formData.stage,
+          case_status: formData.case_status,
+          notes: formData.notes.trim() || undefined,
           case_number: formData.case_number || undefined,
         })
         toast.success('案件更新成功')
@@ -228,7 +257,7 @@ export default function CaseForm() {
   }
 
   // 更新表单字段
-  const updateField = (field: string, value: string) => {
+  const updateField = (field: string, value: string | number | CaseStageType | CaseStatusType) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
     if (errors[field]) {
       setErrors((prev) => {
@@ -298,50 +327,126 @@ export default function CaseForm() {
             )}
           </div>
 
-          {/* 发明名称 */}
+          {/* 案件名称 */}
           <div className="space-y-2">
             <Label htmlFor="title">
-              发明名称 <span className="text-destructive">*</span>
+              案件名称 <span className="text-destructive">*</span>
             </Label>
             <Input
               id="title"
               value={formData.title}
               onChange={(e) => updateField('title', e.target.value)}
-              placeholder="输入发明名称"
+              placeholder="输入案件名称"
             />
             {errors.title && (
               <p className="text-xs text-destructive">{errors.title}</p>
             )}
           </div>
 
-          {/* 专利类型 */}
+          {/* 专利权人 */}
           <div className="space-y-2">
-            <Label htmlFor="patent_type">
-              专利类型 <span className="text-destructive">*</span>
-            </Label>
-            <Select
-              value={formData.patent_type}
-              onValueChange={(value) => updateField('patent_type', value)}
-            >
-              <SelectTrigger id="patent_type">
-                <SelectValue placeholder="选择专利类型" />
-              </SelectTrigger>
-              <SelectContent>
-                {PATENT_TYPES.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.patent_type && (
-              <p className="text-xs text-destructive">{errors.patent_type}</p>
-            )}
+            <Label htmlFor="patent_holder">专利权人</Label>
+            <Input
+              id="patent_holder"
+              value={formData.patent_holder}
+              onChange={(e) => updateField('patent_holder', e.target.value)}
+              placeholder="留空则默认使用客户名称"
+            />
+            <p className="text-xs text-muted-foreground">
+              专利权人可与客户不同，留空则使用客户名称
+            </p>
           </div>
 
-          {/* 申请号和申请日（编辑模式显示） */}
+          {/* 专利类型和费减比例 */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="patent_type">
+                专利类型 <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={formData.patent_type}
+                onValueChange={(value) => updateField('patent_type', value)}
+              >
+                <SelectTrigger id="patent_type">
+                  <SelectValue placeholder="选择专利类型" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PATENT_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.patent_type && (
+                <p className="text-xs text-destructive">{errors.patent_type}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="fee_reduction_ratio">费减比例</Label>
+              <Select
+                value={String(formData.fee_reduction_ratio)}
+                onValueChange={(value) => updateField('fee_reduction_ratio', Number(value))}
+              >
+                <SelectTrigger id="fee_reduction_ratio">
+                  <SelectValue placeholder="选择费减比例" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FEE_REDUCTION_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* 案件阶段和案件状态（编辑模式显示） */}
           {formMode === 'edit' && (
             <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="stage">案件阶段</Label>
+                <Select
+                  value={formData.stage}
+                  onValueChange={(value) => updateField('stage', value as CaseStageType)}
+                >
+                  <SelectTrigger id="stage">
+                    <SelectValue placeholder="选择案件阶段" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STAGE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="case_status">案件状态</Label>
+                <Select
+                  value={formData.case_status}
+                  onValueChange={(value) => updateField('case_status', value as CaseStatusType)}
+                >
+                  <SelectTrigger id="case_status">
+                    <SelectValue placeholder="选择案件状态" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CASE_STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {/* 申请号、申请日、授权日（编辑模式显示） */}
+          {formMode === 'edit' && (
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="application_number">申请号</Label>
                 <Input
@@ -353,12 +458,21 @@ export default function CaseForm() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="filing_date">申请日</Label>
+                <Label htmlFor="filing_date">申请日（递交日）</Label>
                 <Input
                   id="filing_date"
                   type="date"
                   value={formData.filing_date}
                   onChange={(e) => updateField('filing_date', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="grant_date">授权日期</Label>
+                <Input
+                  id="grant_date"
+                  type="date"
+                  value={formData.grant_date}
+                  onChange={(e) => updateField('grant_date', e.target.value)}
                 />
               </div>
             </div>
@@ -394,12 +508,14 @@ export default function CaseForm() {
 
           {/* 备注 */}
           <div className="space-y-2">
-            <Label htmlFor="remarks">备注</Label>
-            <Input
-              id="remarks"
-              value={formData.remarks}
-              onChange={(e) => updateField('remarks', e.target.value)}
+            <Label htmlFor="notes">备注</Label>
+            <textarea
+              id="notes"
+              value={formData.notes}
+              onChange={(e) => updateField('notes', e.target.value)}
               placeholder="备注信息（可选）"
+              className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              rows={2}
             />
           </div>
 

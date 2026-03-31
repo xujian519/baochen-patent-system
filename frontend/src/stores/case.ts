@@ -51,7 +51,8 @@ interface CaseState {
 
 const defaultFilters: CaseFilters = {
   search: '',
-  status: '',
+  case_status: '',
+  stage: '',
   patent_type: '',
   client_id: undefined,
   agent_id: undefined,

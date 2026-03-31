@@ -1,19 +1,26 @@
 import { useCaseStore } from '@/stores/case'
 import { useAuthStore } from '@/stores/auth'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Edit, Trash2, X } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
-// 详情字段显示组件
+// 导入共享模块
+import {
+  formatDate,
+  FEE_REDUCTION_OPTIONS,
+  StageBadge,
+  CaseStatusBadge,
+} from '@/utils/case-helpers'
+
+// ========== 详情字段显示组件 ==========
 function DetailField({
   label,
   value,
   className = '',
 }: {
   label: string
-  value?: string | null
+  value?: ReactNode
   className?: string
 }) {
   return (
@@ -24,43 +31,7 @@ function DetailField({
   )
 }
 
-// 获取状态徽章样式（11种状态，不同颜色区分）
-function getStatusBadge(status: string) {
-  const statusStyles: Record<string, string> = {
-    // 初始状态 - 蓝色系
-    '新案': 'bg-sky-100 text-sky-700 border-sky-200',
-    // 进行中 - 蓝色系
-    '撰写中': 'bg-blue-100 text-blue-700 border-blue-200',
-    '已递交/在审': 'bg-indigo-100 text-indigo-700 border-indigo-200',
-    // 等待状态 - 黄色/橙色系
-    '待质检': 'bg-amber-100 text-amber-700 border-amber-200',
-    '待递交': 'bg-orange-100 text-orange-700 border-orange-200',
-    '答复OA': 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    // 完成状态 - 绿色系
-    '已定稿': 'bg-emerald-100 text-emerald-700 border-emerald-200',
-    '授权': 'bg-green-100 text-green-700 border-green-200',
-    '结案归档': 'bg-teal-100 text-teal-700 border-teal-200',
-    // 终止状态 - 红色/灰色系
-    '驳回': 'bg-red-100 text-red-700 border-red-200',
-    '放弃': 'bg-gray-100 text-gray-600 border-gray-200',
-    // 兼容旧数据
-    '在审': 'bg-indigo-100 text-indigo-700 border-indigo-200',
-    '已授权': 'bg-green-100 text-green-700 border-green-200',
-    '已驳回': 'bg-red-100 text-red-700 border-red-200',
-    '已撤回': 'bg-gray-100 text-gray-600 border-gray-200',
-  }
-
-  return (
-    <Badge
-      variant="outline"
-      className={statusStyles[status] || 'bg-gray-100 text-gray-700 border-gray-200'}
-    >
-      {status}
-    </Badge>
-  )
-}
-
-// 面板版本的案件详情（用于左右分栏布局）
+// ========== 案件详情面板组件 ==========
 export function CaseDetailPanel() {
   const {
     currentCase,
@@ -115,7 +86,8 @@ export function CaseDetailPanel() {
           <div className="flex-1 pr-4">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold">{currentCase.case_number}</h2>
-              {getStatusBadge(currentCase.status)}
+              <StageBadge stage={currentCase.stage} />
+              <CaseStatusBadge caseStatus={currentCase.case_status} />
             </div>
             <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
               {currentCase.title}
@@ -165,50 +137,79 @@ export function CaseDetailPanel() {
 
             {/* 基本信息 Tab */}
             <TabsContent value="basic" className="mt-4 space-y-4">
-              <dl className="grid grid-cols-2 gap-4">
-                <DetailField label="案件编号" value={currentCase.case_number} />
-                <DetailField label="主体" value={currentCase.entity} />
-                <DetailField label="发明名称" value={currentCase.title} className="col-span-2" />
-                <DetailField label="专利类型" value={currentCase.patent_type} />
-                <DetailField label="当前阶段" value={currentCase.current_stage} />
-                <DetailField label="申请号" value={currentCase.application_number} />
-                <DetailField
-                  label="申请日"
-                  value={
-                    currentCase.filing_date
-                      ? new Date(currentCase.filing_date).toLocaleDateString('zh-CN')
-                      : null
-                  }
-                />
-                <DetailField
-                  label="客户"
-                  value={
-                    currentCase.client
-                      ? `${currentCase.client.name}${
-                          currentCase.client.short_name
-                            ? ` (${currentCase.client.short_name})`
-                            : ''
-                        }`
-                      : null
-                  }
-                  className="col-span-2"
-                />
-                <DetailField label="代理师" value={currentCase.agent?.name} />
-                <DetailField label="协办人" value={currentCase.assistant?.name} />
-                <DetailField
-                  label="最近期限"
-                  value={
-                    currentCase.nearest_deadline
-                      ? new Date(currentCase.nearest_deadline).toLocaleDateString('zh-CN')
-                      : null
-                  }
-                />
-                <DetailField
-                  label="创建时间"
-                  value={new Date(currentCase.created_at).toLocaleString('zh-CN')}
-                />
-                <DetailField label="备注" value={currentCase.remarks} className="col-span-2" />
-              </dl>
+              {/* 状态信息 */}
+              <div className="rounded-lg bg-muted/30 p-3">
+                <h4 className="mb-2 text-sm font-medium">状态信息</h4>
+                <dl className="grid grid-cols-2 gap-3">
+                  <DetailField label="案件编号" value={currentCase.case_number} />
+                  <DetailField label="主体" value={currentCase.entity} />
+                  <DetailField label="案件阶段" value={<StageBadge stage={currentCase.stage} />} />
+                  <DetailField label="案件状态" value={<CaseStatusBadge caseStatus={currentCase.case_status} />} />
+                </dl>
+              </div>
+
+              {/* 基本信息 */}
+              <div className="rounded-lg bg-muted/30 p-3">
+                <h4 className="mb-2 text-sm font-medium">基本信息</h4>
+                <dl className="grid grid-cols-2 gap-3">
+                  <DetailField label="案件名称" value={currentCase.title} className="col-span-2" />
+                  <DetailField label="专利类型" value={currentCase.patent_type} />
+                  <DetailField label="申请号" value={currentCase.application_number} />
+                </dl>
+              </div>
+
+              {/* 客户与权人 */}
+              <div className="rounded-lg bg-muted/30 p-3">
+                <h4 className="mb-2 text-sm font-medium">客户与权人</h4>
+                <dl className="grid grid-cols-2 gap-3">
+                  <DetailField
+                    label="客户"
+                    value={
+                      currentCase.client
+                        ? `${currentCase.client.name}${
+                            currentCase.client.short_name
+                              ? ` (${currentCase.client.short_name})`
+                              : ''
+                          }`
+                        : null
+                    }
+                    className="col-span-2"
+                  />
+                  <DetailField label="专利权人" value={currentCase.patent_holder || currentCase.client?.name} className="col-span-2" />
+                  <DetailField label="费减比例" value={FEE_REDUCTION_OPTIONS[currentCase.fee_reduction_ratio || 0]} />
+                </dl>
+              </div>
+
+              {/* 人员信息 */}
+              <div className="rounded-lg bg-muted/30 p-3">
+                <h4 className="mb-2 text-sm font-medium">人员信息</h4>
+                <dl className="grid grid-cols-2 gap-3">
+                  <DetailField label="代理师" value={currentCase.agent?.name} />
+                  <DetailField label="协办人" value={currentCase.assistant?.name} />
+                </dl>
+              </div>
+
+              {/* 日期信息 */}
+              <div className="rounded-lg bg-muted/30 p-3">
+                <h4 className="mb-2 text-sm font-medium">日期信息</h4>
+                <dl className="grid grid-cols-2 gap-3">
+                  <DetailField label="立案日期" value={formatDate(currentCase.created_at)} />
+                  <DetailField label="申请日（递交日）" value={formatDate(currentCase.filing_date)} />
+                  <DetailField label="授权日期" value={formatDate(currentCase.grant_date)} />
+                  <DetailField
+                    label="最近期限"
+                    value={formatDate(currentCase.nearest_deadline)}
+                  />
+                </dl>
+              </div>
+
+              {/* 备注 */}
+              {currentCase.notes && (
+                <div className="rounded-lg bg-muted/30 p-3">
+                  <h4 className="mb-2 text-sm font-medium">备注</h4>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{currentCase.notes}</p>
+                </div>
+              )}
             </TabsContent>
 
             {/* 时间线 Tab */}
@@ -252,5 +253,5 @@ export function CaseDetailPanel() {
   )
 }
 
-// 默认导出（保持向后兼容，用于独立页面）
+// 默认导出（保持向后兼容）
 export default CaseDetailPanel

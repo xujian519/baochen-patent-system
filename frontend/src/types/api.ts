@@ -49,6 +49,15 @@ export interface Client {
   created_at: string
 }
 
+// 案件状态（四种状态）
+export type CaseStatusType = '进行中' | '已结案' | '已终止' | '已暂停'
+
+// 案件阶段（11种阶段）
+export type CaseStageType = '新案' | '撰写中' | '待质检' | '已定稿' | '待递交' | '已递交-在审' | '答复OA' | '授权' | '驳回' | '放弃' | '结案归档'
+
+// 费减比例
+export type FeeReductionRatio = 0 | 70 | 85 | 100
+
 // 案件
 export interface Case {
   id: number
@@ -56,20 +65,24 @@ export interface Case {
   entity: string
   client_id: number
   client?: Client
-  title: string
+  title: string  // 案件名称
   patent_type: '发明' | '实用新型' | '外观设计'
-  application_number: string | null
-  filing_date: string | null
-  status: string
+  application_number: string | null  // 申请号
+  filing_date: string | null  // 申请日（递交日期）
+  grant_date: string | null  // 授权日期
+  patent_holder: string | null  // 专利权人
+  stage: CaseStageType  // 案件阶段
+  case_status: CaseStatusType  // 案件状态
   current_stage: string | null
   agent_id: number | null
   agent?: User
   assistant_id: number | null
   assistant?: User
+  fee_reduction_ratio: FeeReductionRatio  // 费减比例
   nearest_deadline: string | null
   deadline_level: number
-  remarks: string | null
-  created_at: string
+  notes: string | null
+  created_at: string  // 立案日期
   updated_at: string
 }
 
@@ -79,11 +92,13 @@ export interface CaseCreate {
   client_name?: string
   title: string
   patent_type: '发明' | '实用新型' | '外观设计'
+  patent_holder?: string
+  fee_reduction_ratio?: FeeReductionRatio
   agent_id?: number | null
   agent_name?: string
   assistant_id?: number | null
   assistant_name?: string
-  remarks?: string
+  notes?: string
 }
 
 // 案件更新请求
@@ -92,20 +107,26 @@ export interface CaseUpdate {
   patent_type?: '发明' | '实用新型' | '外观设计'
   application_number?: string | null
   filing_date?: string | null
+  grant_date?: string | null
+  patent_holder?: string
+  fee_reduction_ratio?: FeeReductionRatio
   client_id?: number
   client_name?: string
   agent_id?: number | null
   agent_name?: string
   assistant_id?: number | null
   assistant_name?: string
-  remarks?: string
+  stage?: CaseStageType
+  case_status?: CaseStatusType
+  notes?: string
   case_number?: string
 }
 
 // 案件筛选条件
 export interface CaseFilters {
   search?: string
-  status?: string
+  stage?: string  // 案件阶段
+  case_status?: string  // 案件状态
   patent_type?: string
   client_id?: number
   agent_id?: number

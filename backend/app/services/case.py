@@ -153,7 +153,7 @@ class CaseService:
         # 创建初始时间线记录
         timeline = CaseTimeline(
             case_id=case.id,
-            status=case.status,
+            status=case.stage,
             event_type="创建案件",
             event_date=date.today(),
             description=f"创建案件，编号：{case_number}",
@@ -228,7 +228,8 @@ class CaseService:
         skip: int = 0,
         limit: int = 20,
         search: Optional[str] = None,
-        status: Optional[str] = None,
+        stage: Optional[str] = None,
+        case_status: Optional[str] = None,
         patent_type: Optional[str] = None,
         client_id: Optional[int] = None,
         agent_id: Optional[int] = None,
@@ -242,7 +243,8 @@ class CaseService:
             skip: 跳过记录数
             limit: 返回记录数
             search: 搜索关键词（案件名、案件编号、客户名）
-            status: 案件状态筛选
+            stage: 案件阶段筛选
+            case_status: 案件状态筛选
             patent_type: 专利类型筛选
             client_id: 客户ID筛选
             agent_id: 代理师ID筛选
@@ -271,10 +273,15 @@ class CaseService:
             stmt = stmt.join(Client, isouter=True).where(search_condition)
             count_stmt = count_stmt.join(Client, isouter=True).where(search_condition)
 
-        # 状态筛选
-        if status:
-            stmt = stmt.where(Case.status == status)
-            count_stmt = count_stmt.where(Case.status == status)
+        # 案件阶段筛选
+        if stage:
+            stmt = stmt.where(Case.stage == stage)
+            count_stmt = count_stmt.where(Case.stage == stage)
+
+        # 案件状态筛选
+        if case_status:
+            stmt = stmt.where(Case.case_status == case_status)
+            count_stmt = count_stmt.where(Case.case_status == case_status)
 
         # 专利类型筛选
         if patent_type:
@@ -384,23 +391,37 @@ class CaseService:
         if not case:
             return None
 
-        old_status = case.status
-        new_status = status_data.status
+        timeline_events = []
+
+        # 更新案件阶段
+        if status_data.stage:
+            old_stage = case.stage
+            new_stage = status_data.stage
+            case.stage = new_stage
+            timeline_events.append(f"阶段从 '{old_stage}' 变更为 '{new_stage}'")
 
         # 更新案件状态
-        case.status = new_status
+        if status_data.case_status:
+            old_status = case.case_status
+            new_status = status_data.case_status
+            case.case_status = new_status
+            timeline_events.append(f"状态从 '{old_status}' 变更为 '{new_status}'")
 
         # 创建时间线记录
-        timeline = CaseTimeline(
-            case_id=case.id,
-            status=new_status,
-            event_type="状态变更",
-            event_date=date.today(),
-            description=f"状态从 '{old_status}' 变更为 '{new_status}'"
-                       + (f"，备注：{status_data.notes}" if status_data.notes else ""),
-            operator=operator,
-        )
-        db.add(timeline)
+        if timeline_events:
+            description = "、".join(timeline_events)
+            if status_data.notes:
+                description += f"，备注：{status_data.notes}"
+
+            timeline = CaseTimeline(
+                case_id=case.id,
+                status=case.stage,
+                event_type="状态变更",
+                event_date=date.today(),
+                description=description,
+                operator=operator,
+            )
+            db.add(timeline)
 
         await db.flush()
         await db.refresh(case)
@@ -485,10 +506,18 @@ class CaseService:
         Returns:
             统计信息字典
         """
-        # 按状态统计
+        # 按案件阶段统计
+        stage_stmt = (
+            select(Case.stage, func.count(Case.id))
+            .group_by(Case.stage)
+        )
+        stage_result = await db.execute(stage_stmt)
+        stage_stats = dict(stage_result.all())
+
+        # 按案件状态统计
         status_stmt = (
-            select(Case.status, func.count(Case.id))
-            .group_by(Case.status)
+            select(Case.case_status, func.count(Case.id))
+            .group_by(Case.case_status)
         )
         status_result = await db.execute(status_stmt)
         status_stats = dict(status_result.all())
@@ -508,6 +537,7 @@ class CaseService:
 
         return {
             "total": total,
+            "by_stage": stage_stats,
             "by_status": status_stats,
             "by_patent_type": type_stats,
         }

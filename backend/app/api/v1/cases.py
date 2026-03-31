@@ -30,7 +30,8 @@ async def get_cases(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     search: Optional[str] = Query(None, description="搜索关键词（案件名/案件编号/客户名）"),
-    status: Optional[str] = Query(None, description="案件状态筛选"),
+    stage: Optional[str] = Query(None, description="案件阶段筛选"),
+    case_status: Optional[str] = Query(None, description="案件状态筛选"),
     patent_type: Optional[str] = Query(None, description="专利类型筛选"),
     client_id: Optional[int] = Query(None, description="客户ID筛选"),
     agent_id: Optional[int] = Query(None, description="代理师ID筛选"),
@@ -44,7 +45,8 @@ async def get_cases(
     - **page**: 页码，从1开始
     - **page_size**: 每页数量，默认20，最大100
     - **search**: 搜索关键词（案件名、案件编号、申请号、客户名）
-    - **status**: 案件状态筛选
+    - **stage**: 案件阶段筛选（新案/撰写中/待质检/已定稿/待递交/已递交-在审/答复OA/授权/驳回/放弃/结案归档）
+    - **case_status**: 案件状态筛选（进行中/已结案/已终止/已暂停）
     - **patent_type**: 专利类型筛选（发明/实用新型/外观设计）
     - **client_id**: 按客户筛选
     - **agent_id**: 按代理师筛选
@@ -56,7 +58,8 @@ async def get_cases(
         skip=skip,
         limit=page_size,
         search=search,
-        status=status,
+        stage=stage,
+        case_status=case_status,
         patent_type=patent_type,
         client_id=client_id,
         agent_id=agent_id,
