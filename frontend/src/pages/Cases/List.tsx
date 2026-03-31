@@ -68,18 +68,37 @@ function getDeadlineBadge(level: number, daysText: string | null) {
   )
 }
 
-// 获取状态徽章样式
+// 获取状态徽章样式（11种状态，不同颜色区分）
 function getStatusBadge(status: string) {
   const statusStyles: Record<string, string> = {
-    在审: 'bg-blue-100 text-blue-800',
-    已授权: 'bg-green-100 text-green-800',
-    已驳回: 'bg-red-100 text-red-800',
-    已撤回: 'bg-gray-100 text-gray-800',
-    已放弃: 'bg-gray-100 text-gray-600',
+    // 初始状态 - 蓝色系
+    '新案': 'bg-sky-100 text-sky-700 border-sky-200',
+    // 进行中 - 蓝色系
+    '撰写中': 'bg-blue-100 text-blue-700 border-blue-200',
+    '已递交/在审': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    // 等待状态 - 黄色/橙色系
+    '待质检': 'bg-amber-100 text-amber-700 border-amber-200',
+    '待递交': 'bg-orange-100 text-orange-700 border-orange-200',
+    '答复OA': 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    // 完成状态 - 绿色系
+    '已定稿': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    '授权': 'bg-green-100 text-green-700 border-green-200',
+    '结案归档': 'bg-teal-100 text-teal-700 border-teal-200',
+    // 终止状态 - 红色/灰色系
+    '驳回': 'bg-red-100 text-red-700 border-red-200',
+    '放弃': 'bg-gray-100 text-gray-600 border-gray-200',
+    // 兼容旧数据
+    '在审': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    '已授权': 'bg-green-100 text-green-700 border-green-200',
+    '已驳回': 'bg-red-100 text-red-700 border-red-200',
+    '已撤回': 'bg-gray-100 text-gray-600 border-gray-200',
   }
 
   return (
-    <Badge className={statusStyles[status] || 'bg-gray-100 text-gray-800'}>
+    <Badge
+      variant="outline"
+      className={statusStyles[status] || 'bg-gray-100 text-gray-700 border-gray-200'}
+    >
       {status}
     </Badge>
   )
