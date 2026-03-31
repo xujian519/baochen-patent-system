@@ -1,0 +1,71 @@
+# 宝宸专利管理系统 - Docker Compose 配置
+# 使用方法: docker-compose up -d
+
+services:
+  # PostgreSQL 数据库
+  db:
+    image: postgres:15-alpine
+    container_name: baochen-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-baochen}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-baochen123}
+      POSTGRES_DB: ${DB_NAME:-baochen_mgmt}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # 不暴露端口到宿主机，仅容器内部访问
+    # ports:
+    #   - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-baochen} -d ${DB_NAME:-baochen_mgmt}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI 后端
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: baochen-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-baochen}:${DB_PASSWORD:-baochen123}@db:5432/${DB_NAME:-baochen_mgmt}
+      SECRET_KEY: ${SECRET_KEY:-your-secret-key-change-in-production}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./backend/migrations:/app/migrations
+      - uploads_data:/app/uploads
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        python -m app.init_db &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000
+      "
+
+  # React 前端
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: baochen-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+
+volumes:
+  postgres_data:
+  uploads_data:
+
+networks:
+  default:
+    name: baochen-network
