@@ -19,7 +19,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import CaseDetail from './Detail'
+import { ResizablePanels } from '@/components/ui/resizable'
+import { CaseDetailPanel } from './Detail'
 import CaseForm from './Form'
 import type { Case } from '@/types/api'
 
@@ -109,11 +110,13 @@ export default function CaseList() {
     pageSize,
     isLoading,
     filters,
+    isDetailOpen,
     fetchCases,
     setFilters,
     resetFilters,
     setPage,
     openDetail,
+    closeDetail,
     openForm,
   } = useCaseStore()
 
@@ -144,215 +147,225 @@ export default function CaseList() {
   }
 
   return (
-    <div className="flex h-full flex-col space-y-4">
-      {/* 页面标题和操作区 */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">案件管理</h1>
-          <p className="text-sm text-muted-foreground">
-            共 {total} 条记录
-          </p>
-        </div>
-        <Button onClick={() => openForm('create')}>
-          <Plus className="mr-2 h-4 w-4" />
-          新建案件
-        </Button>
-      </div>
-
-      {/* 筛选条件区 */}
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-4">
-        {/* 搜索框 */}
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="搜索案件编号、发明名称..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        {/* 状态筛选 */}
-        <Select
-          value={filters.status || 'all'}
-          onValueChange={(value) => setFilters({ status: value === 'all' ? '' : value })}
-        >
-          <SelectTrigger className="w-[120px]">
-            <SelectValue placeholder="状态" />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUS_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* 专利类型筛选 */}
-        <Select
-          value={filters.patent_type || 'all'}
-          onValueChange={(value) => setFilters({ patent_type: value === 'all' ? '' : value })}
-        >
-          <SelectTrigger className="w-[120px]">
-            <SelectValue placeholder="类型" />
-          </SelectTrigger>
-          <SelectContent>
-            {PATENT_TYPE_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* 重置按钮 */}
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => {
-            setSearchInput('')
-            resetFilters()
-          }}
-          title="重置筛选"
-        >
-          <RotateCcw className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {/* 数据表格 */}
-      <div className="flex-1 overflow-auto rounded-lg border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="w-[140px]">案件编号</TableHead>
-              <TableHead className="min-w-[200px]">发明名称</TableHead>
-              <TableHead className="w-[80px]">类型</TableHead>
-              <TableHead className="w-[120px]">客户</TableHead>
-              <TableHead className="w-[80px]">状态</TableHead>
-              <TableHead className="w-[100px]">最近期限</TableHead>
-              <TableHead className="w-[100px]">代理师</TableHead>
-              <TableHead className="w-[100px]">创建时间</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
-                  <div className="flex items-center justify-center">
-                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                    <span className="ml-2 text-muted-foreground">加载中...</span>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : cases.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                  暂无数据
-                </TableCell>
-              </TableRow>
-            ) : (
-              cases.map((caseItem) => {
-                const deadline = getDaysRemaining(caseItem.nearest_deadline)
-                return (
-                  <TableRow
-                    key={caseItem.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleRowClick(caseItem)}
-                  >
-                    <TableCell className="font-mono text-sm">
-                      {caseItem.case_number}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <div className="truncate max-w-[300px]" title={caseItem.title}>
-                        {caseItem.title}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{caseItem.patent_type}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="truncate max-w-[120px]" title={caseItem.client?.name}>
-                        {caseItem.client?.short_name || caseItem.client?.name || '-'}
-                      </div>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(caseItem.status)}</TableCell>
-                    <TableCell>
-                      {getDeadlineBadge(deadline.level, deadline.text)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="truncate max-w-[100px]">
-                        {caseItem.agent?.name || '-'}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {new Date(caseItem.created_at).toLocaleDateString('zh-CN')}
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* 分页 */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            第 {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, total)} 条，共 {total} 条
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(page - 1)}
-              disabled={page <= 1}
-            >
-              上一页
-            </Button>
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum: number
-                if (totalPages <= 5) {
-                  pageNum = i + 1
-                } else if (page <= 3) {
-                  pageNum = i + 1
-                } else if (page >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i
-                } else {
-                  pageNum = page - 2 + i
-                }
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={pageNum === page ? 'default' : 'outline'}
-                    size="sm"
-                    className="w-8"
-                    onClick={() => setPage(pageNum)}
-                  >
-                    {pageNum}
-                  </Button>
-                )
-              })}
+    <>
+      <ResizablePanels
+        leftPanel={
+          <div className="flex h-full flex-col space-y-4 p-4">
+            {/* 页面标题和操作区 */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">案件管理</h1>
+                <p className="text-sm text-muted-foreground">
+                  共 {total} 条记录
+                </p>
+              </div>
+              <Button onClick={() => openForm('create')}>
+                <Plus className="mr-2 h-4 w-4" />
+                新建案件
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(page + 1)}
-              disabled={page >= totalPages}
-            >
-              下一页
-            </Button>
-          </div>
-        </div>
-      )}
 
-      {/* 案件详情抽屉 */}
-      <CaseDetail />
+            {/* 筛选条件区 */}
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card p-4">
+              {/* 搜索框 */}
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="搜索案件编号、发明名称..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              {/* 状态筛选 */}
+              <Select
+                value={filters.status || 'all'}
+                onValueChange={(value) => setFilters({ status: value === 'all' ? '' : value })}
+              >
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="状态" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* 专利类型筛选 */}
+              <Select
+                value={filters.patent_type || 'all'}
+                onValueChange={(value) => setFilters({ patent_type: value === 'all' ? '' : value })}
+              >
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="类型" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PATENT_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* 重置按钮 */}
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  setSearchInput('')
+                  resetFilters()
+                }}
+                title="重置筛选"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* 数据表格 */}
+            <div className="flex-1 overflow-auto rounded-lg border bg-card">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="w-[140px]">案件编号</TableHead>
+                    <TableHead className="min-w-[200px]">发明名称</TableHead>
+                    <TableHead className="w-[80px]">类型</TableHead>
+                    <TableHead className="w-[120px]">客户</TableHead>
+                    <TableHead className="w-[80px]">状态</TableHead>
+                    <TableHead className="w-[100px]">最近期限</TableHead>
+                    <TableHead className="w-[100px]">代理师</TableHead>
+                    <TableHead className="w-[100px]">创建时间</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="h-24 text-center">
+                        <div className="flex items-center justify-center">
+                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                          <span className="ml-2 text-muted-foreground">加载中...</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : cases.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                        暂无数据
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    cases.map((caseItem) => {
+                      const deadline = getDaysRemaining(caseItem.nearest_deadline)
+                      return (
+                        <TableRow
+                          key={caseItem.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => handleRowClick(caseItem)}
+                        >
+                          <TableCell className="font-mono text-sm">
+                            {caseItem.case_number}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            <div className="truncate max-w-[300px]" title={caseItem.title}>
+                              {caseItem.title}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{caseItem.patent_type}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="truncate max-w-[120px]" title={caseItem.client?.name}>
+                              {caseItem.client?.short_name || caseItem.client?.name || '-'}
+                            </div>
+                          </TableCell>
+                          <TableCell>{getStatusBadge(caseItem.status)}</TableCell>
+                          <TableCell>
+                            {getDeadlineBadge(deadline.level, deadline.text)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="truncate max-w-[100px]">
+                              {caseItem.agent?.name || '-'}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {new Date(caseItem.created_at).toLocaleDateString('zh-CN')}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* 分页 */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  第 {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, total)} 条，共 {total} 条
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(page - 1)}
+                    disabled={page <= 1}
+                  >
+                    上一页
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum: number
+                      if (totalPages <= 5) {
+                        pageNum = i + 1
+                      } else if (page <= 3) {
+                        pageNum = i + 1
+                      } else if (page >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i
+                      } else {
+                        pageNum = page - 2 + i
+                      }
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={pageNum === page ? 'default' : 'outline'}
+                          size="sm"
+                          className="w-8"
+                          onClick={() => setPage(pageNum)}
+                        >
+                          {pageNum}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage(page + 1)}
+                    disabled={page >= totalPages}
+                  >
+                    下一页
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        }
+        rightPanel={<CaseDetailPanel />}
+        rightPanelOpen={isDetailOpen}
+        onRightPanelClose={closeDetail}
+        defaultLeftWidth={60}
+        minLeftWidth={40}
+        maxLeftWidth={75}
+        rightPanelMinWidth={350}
+      />
 
       {/* 案件表单弹窗 */}
       <CaseForm />
-    </div>
+    </>
   )
 }
